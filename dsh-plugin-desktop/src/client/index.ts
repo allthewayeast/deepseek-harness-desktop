@@ -5,6 +5,10 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import { applyAdvancedShell } from './advanced-shell.ts'
+import { installContentApplier } from './content-applier.ts'
+import { ContentRow } from './ContentRow.tsx'
+import { DESKTOP_CONTENT_NAMESPACE, type DesktopContentSettings } from '../content-settings-types.ts'
+import { installOpenPathOverride } from './open-path-override.ts'
 import { startRendererBootReporter } from './boot-health.ts'
 import { applyDesktopSettings } from './desktop-settings.ts'
 import { installDesktopDirectoryPickerBridge, requestDesktopDirectoryValidation } from './directory-picker.ts'
@@ -40,6 +44,9 @@ export type {
   DesktopSettingsSectionProps,
   DesktopShellSettings,
 } from './DesktopSettingsSection.tsx'
+export { ContentRow } from './ContentRow.tsx'
+export { DESKTOP_CONTENT_NAMESPACE } from '../content-settings-types.ts'
+export type { DesktopContentSettings } from '../content-settings-types.ts'
 export {
   RENDERER_BOOT_REPORT_PATH,
   rendererBootReport,
@@ -88,4 +95,26 @@ export function apply(ctx: ClientContext): void {
     )
   }
   if (environment.mode === 'advanced') applyAdvancedShell(ctx, environment)
+
+  ctx.effect(
+    () => installOpenPathOverride(ctx),
+    'dsh-plugin-desktop: native path opener',
+  )
+
+  const content = ctx.settingsScope.bind<DesktopContentSettings>({
+    namespace: DESKTOP_CONTENT_NAMESPACE,
+  })
+  ctx.effect(
+    () => installContentApplier(content),
+    'dsh-plugin-desktop: content document variables',
+  )
+  ctx.effect(
+    () => ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+      name: 'settings.general.item',
+      id: 'desktop-content',
+      order: 20,
+      inject: () => ({ scope: content }),
+    }, ContentRow)),
+    'dsh-plugin-desktop: content settings row',
+  )
 }

@@ -109,6 +109,7 @@ try {
     openTerminal() {},
     setLocalePreference(preference) { runtime.locale = preference ?? 'en' },
     setThemeSource(source) { nativeThemeSource = source },
+    setDefaultEditor() {},
     async requestRestart() {},
     prepareToQuit() {},
   }

@@ -112,6 +112,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   private updateCleanupTask: Promise<void> | undefined
   private rendererHealthGate: DesktopRendererHealthGate | undefined
   private profileCreateWindow: ProfileCreateWindow | undefined
+  private defaultEditor = ''
 
   constructor(
     private readonly restart: () => Promise<void>,
@@ -232,6 +233,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
         abortRendererBootMonitoring: cause => { this.rendererHealthGate?.stop(cause) },
         failRendererBoot: error => { this.failRendererBoot('renderer-failed', error) },
         logError: message => { this.logError(message) },
+        openFileLink: url => this.openFileLink(url),
       })
       this.generation = generation
       this.mountTask = generation.mount(beforeInteractive).then(() => {
@@ -419,6 +421,36 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       // material invalidates the backdrop immediately after a live theme change.
       this.generation.refreshThemeMaterial()
     }
+  }
+
+  /**
+   * Select the program launched for file links opened from the renderer.
+   * @param path - editor executable path; empty restores the OS file association.
+   */
+  setDefaultEditor(path: string): void {
+    this.defaultEditor = path
+  }
+
+  /**
+   * Open a renderer file link through the configured editor or the OS association.
+   * @param url - parsed `file:` URL carrying the target path.
+   */
+  private async openFileLink(url: URL): Promise<void> {
+    const decoded = decodeURIComponent(url.pathname)
+    const target = this.platform === 'win32' && decoded.startsWith('/') ? decoded.slice(1) : decoded
+    if (this.defaultEditor === '') {
+      const error = await shell.openPath(target)
+      if (error !== '') throw new Error(error)
+      return
+    }
+    const child = spawn(this.defaultEditor, [target], { detached: true, stdio: 'ignore' })
+    // A launch failure surfaces asynchronously; without this the editor path
+    // silently does nothing and the OS association never runs either.
+    child.on('error', (cause: Error) => {
+      this.logError(`dsh-plugin-desktop: default editor ${this.defaultEditor} failed to launch: ${cause.message}`)
+      void shell.openPath(target)
+    })
+    child.unref()
   }
 
   /** @inheritdoc */

@@ -203,6 +203,9 @@ export interface DesktopRuntime {
   /** Apply a built-in theme preference to Electron's native appearance. */
   setThemeSource(source: DesktopThemeSource): void
 
+  /** Select the program launched for file links opened from the renderer. */
+  setDefaultEditor(path: string): void
+
   /** Request orderly Cordis teardown followed by an Electron relaunch. */
   requestRestart(): Promise<void>
 

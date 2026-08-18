@@ -15,6 +15,11 @@ import {
 } from '@deepseek-ai/dsh-client-ui-theme'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import {
+  DESKTOP_CONTENT_NAMESPACE,
+  DesktopContentSchema,
+  type DesktopContentSettings,
+} from './content-settings-schema.ts'
+import {
   handleRendererBootRequest,
   RENDERER_BOOT_REPORT_PATH,
 } from './renderer-boot.ts'
@@ -63,6 +68,7 @@ export const inject = ['webServer', 'webRuntime', 'appExit', 'settings']
 
 /** Standard settings namespace shared by tray and configuration surfaces. */
 export const DESKTOP_SETTINGS_NAMESPACE = settingsNamespace('dsh-desktop')
+const DESKTOP_CONTENT_NS = settingsNamespace(DESKTOP_CONTENT_NAMESPACE)
 
 const UI_THEME_SETTINGS_NAMESPACE = settingsNamespace(THEME_SETTINGS_NAMESPACE)
 const UI_LOCALE_SETTINGS_NAMESPACE = settingsNamespace(LOCALE_SETTINGS_NAMESPACE)
@@ -170,6 +176,10 @@ export function apply(ctx: Context, config: Config): void {
       },
     },
   )
+  
+  // Register desktop content settings
+  ctx.settings.register(DESKTOP_CONTENT_NS, DesktopContentSchema, { applies: 'live' })
+  
   const rendererOrigin = `http://127.0.0.1:${String(ctx.webServer.port)}`
   ctx.on('webserver/index-inject', table => {
     table.push(...desktopBootRecoveryInjections())
@@ -287,6 +297,15 @@ export function apply(ctx: Context, config: Config): void {
     if (namespace !== UI_LOCALE_SETTINGS_NAMESPACE) return
     runtime.setLocalePreference((next as LocaleSettings).preference)
   })
+  ctx.on('settings/updated', (namespace, next) => {
+    if (namespace !== DESKTOP_CONTENT_NS) return
+    runtime.setDefaultEditor((next as DesktopContentSettings).defaultEditor)
+  })
+  // Set initial defaultEditor value
+  const initialContent = ctx.settings.get(DESKTOP_CONTENT_NS) as DesktopContentSettings | undefined
+  if (initialContent?.defaultEditor) {
+    runtime.setDefaultEditor(initialContent.defaultEditor)
+  }
   ctx.effect(
     () => runtime.schedule({
       ...config,

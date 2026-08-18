@@ -42,6 +42,7 @@ interface PluginHarness {
   restart: ReturnType<typeof vi.fn<() => Promise<void>>>
   setLocalePreference: ReturnType<typeof vi.fn<(locale: LocaleId | undefined) => void>>
   setThemeSource: ReturnType<typeof vi.fn<(source: ThemePreference) => void>>
+  setDefaultEditor: ReturnType<typeof vi.fn<(path: string) => void>>
   rendererBoot: ReturnType<typeof vi.fn<(report: RendererBootReport) => void>>
   pickDirectory: ReturnType<typeof vi.fn<() => Promise<string | null>>>
   validateDirectory: ReturnType<typeof vi.fn<(path: string) => Promise<boolean>>>
@@ -58,6 +59,7 @@ function createHarness(platform: DesktopRuntime['platform'] = 'darwin'): PluginH
   const restart = vi.fn(async () => {})
   const setLocalePreference = vi.fn<(locale: LocaleId | undefined) => void>()
   const setThemeSource = vi.fn<(source: ThemePreference) => void>()
+  const setDefaultEditor = vi.fn<(path: string) => void>()
   const rendererBoot = vi.fn<(report: RendererBootReport) => void>()
   const pickDirectory = vi.fn(async () => null)
   const validateDirectory = vi.fn(async () => true)
@@ -95,6 +97,7 @@ function createHarness(platform: DesktopRuntime['platform'] = 'darwin'): PluginH
     reportRendererBoot: rendererBoot,
     setLocalePreference,
     setThemeSource,
+    setDefaultEditor,
     requestRestart: restart,
     prepareToQuit: () => {},
   }
@@ -141,6 +144,7 @@ function createHarness(platform: DesktopRuntime['platform'] = 'darwin'): PluginH
     restart,
     setLocalePreference,
     setThemeSource,
+    setDefaultEditor,
     rendererBoot,
     pickDirectory,
     validateDirectory,

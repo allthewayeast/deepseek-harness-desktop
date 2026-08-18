@@ -5,6 +5,7 @@ import type { DesktopClientEnvironment } from './environment.ts'
 import { AdvancedFrame } from './AdvancedFrame.tsx'
 import { DesktopLayoutState } from './layout-state.ts'
 import { provideDesktopLayout } from './layout-service.ts'
+import { installContentStyles } from './content-styles.ts'
 import { installAdvancedStyles } from './styles.ts'
 import { DesktopThemePresenter } from './theme-presenter.ts'
 
@@ -28,7 +29,9 @@ export function applyAdvancedShell(ctx: ClientContext, environment: DesktopClien
     document.body.dataset.dshDesktopMode = 'advanced'
     document.body.dataset.dshDesktopPlatform = environment.platform
     const removeStyles = installAdvancedStyles()
+    const removeContentStyles = installContentStyles()
     return () => {
+      removeContentStyles()
       removeStyles()
       delete document.body.dataset.dshDesktopMode
       delete document.body.dataset.dshDesktopPlatform

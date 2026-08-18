@@ -2,6 +2,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  ipcMain,
   Menu,
   nativeImage,
   nativeTheme,
@@ -42,6 +43,8 @@ export interface ElectronShellGenerationOptions {
   readonly abortRendererBootMonitoring: (cause: unknown) => void
   readonly failRendererBoot: (error: string) => void
   readonly logError: (message: string) => void
+  /** Open a renderer file:// link through the configured editor or the OS association. */
+  readonly openFileLink: (url: URL) => Promise<void>
 }
 
 /** Own one BrowserWindow and Tray generation, including every native listener. */
@@ -95,15 +98,34 @@ export class ElectronShellGeneration {
       const step = action === 'in' ? 1 : -1
       window.webContents.setZoomLevel(clampedZoomLevel(window.webContents.getZoomLevel() + step))
     }
+    // The window carries no menu bar on Windows, so DevTools needs an explicit
+    // accelerator; renderer-side diagnosis is otherwise unreachable in a package.
+    const handleDevToolsShortcut = (event: Electron.Event, input: Electron.Input): void => {
+      const isF12 = input.key === 'F12'
+      const isInspect = input.control && input.shift && input.key.toLowerCase() === 'i'
+      if (input.type !== 'keyDown' || !(isF12 || isInspect)) return
+      event.preventDefault()
+      window.webContents.toggleDevTools()
+    }
     const navigate = (event: Electron.Event<Electron.WebContentsWillFrameNavigateEventParams>): void => {
       if (!event.isMainFrame) return
       let targetOrigin: string | undefined
+      let targetUrl: URL | undefined
       try {
-        targetOrigin = new URL(event.url).origin
+        targetUrl = new URL(event.url)
+        targetOrigin = targetUrl.origin
       } catch {
         targetOrigin = undefined
       }
-      if (targetOrigin !== origin) event.preventDefault()
+      if (targetOrigin !== origin) {
+        event.preventDefault()
+        // Open file:// links with the configured editor or the system default.
+        if (targetUrl?.protocol === 'file:') {
+          void this.options.openFileLink(targetUrl).catch((cause: unknown) => {
+            this.options.logError(`dsh-plugin-desktop: failed to open file link: ${cause instanceof Error ? cause.message : String(cause)}`)
+          })
+        }
+      }
     }
     const redirect = (
       event: Electron.Event,
@@ -113,12 +135,22 @@ export class ElectronShellGeneration {
     ): void => {
       if (!isMainFrame) return
       let targetOrigin: string | undefined
+      let targetUrl: URL | undefined
       try {
-        targetOrigin = new URL(url).origin
+        targetUrl = new URL(url)
+        targetOrigin = targetUrl.origin
       } catch {
         targetOrigin = undefined
       }
-      if (targetOrigin !== origin) event.preventDefault()
+      if (targetOrigin !== origin) {
+        event.preventDefault()
+        // Open file:// links with the configured editor or the system default.
+        if (targetUrl?.protocol === 'file:') {
+          void this.options.openFileLink(targetUrl).catch((cause: unknown) => {
+            this.options.logError(`dsh-plugin-desktop: failed to open file link: ${cause instanceof Error ? cause.message : String(cause)}`)
+          })
+        }
+      }
     }
     const rendererGone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails): void => {
       const detail = `renderer process gone (reason: ${details.reason}, exitCode: ${formatDesktopExitCode(details.exitCode)})`
@@ -146,6 +178,7 @@ export class ElectronShellGeneration {
     window.on('focus', clearAttention)
     window.on('page-title-updated', preserveBlankTitle)
     window.webContents.on('before-input-event', handleZoomShortcut)
+    window.webContents.on('before-input-event', handleDevToolsShortcut)
     window.webContents.on('will-frame-navigate', navigate)
     window.webContents.on('will-redirect', redirect)
     window.webContents.on('render-process-gone', rendererGone)
@@ -157,11 +190,20 @@ export class ElectronShellGeneration {
           void shell.openExternal(target.href).catch((cause: unknown) => {
             this.options.logError(`dsh-plugin-desktop: failed to open external link: ${cause instanceof Error ? cause.message : String(cause)}`)
           })
+        } else if (target.protocol === 'file:') {
+          void this.options.openFileLink(target).catch((cause: unknown) => {
+            this.options.logError(`dsh-plugin-desktop: failed to open file link: ${cause instanceof Error ? cause.message : String(cause)}`)
+          })
         }
       } catch {
         // A malformed target is rejected with the same deny result.
       }
       return { action: 'deny' }
+    })
+    // Chromium blocks file: navigation from an http: page before any navigation
+    // event fires, so the renderer hands file links over this channel instead.
+    ipcMain.handle('desktop:open-file', async (_event, url: string) => {
+      await this.options.openFileLink(new URL(url))
     })
     window.once('ready-to-show', show)
     let tray: Tray | undefined
@@ -173,10 +215,12 @@ export class ElectronShellGeneration {
       window.off('page-title-updated', preserveBlankTitle)
       window.off('ready-to-show', show)
       window.webContents.off('before-input-event', handleZoomShortcut)
+      window.webContents.off('before-input-event', handleDevToolsShortcut)
       window.webContents.off('will-frame-navigate', navigate)
       window.webContents.off('will-redirect', redirect)
       window.webContents.off('render-process-gone', rendererGone)
       window.webContents.off('did-fail-load', loadFailed)
+      ipcMain.removeHandler('desktop:open-file')
       tray?.off('click', show)
     }
 
