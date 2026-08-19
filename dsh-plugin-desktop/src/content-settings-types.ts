@@ -15,6 +15,9 @@ export const DEFAULT_CODE_FONT = ''
 /** Default editor executable path for opening file links. */
 export const DEFAULT_EDITOR = ''
 
+/** Whether the conversation surface expands to 90% of the page width. */
+export const DEFAULT_WIDE_CONVERSATION = false
+
 /** Durable desktop content section. */
 export interface DesktopContentSettings {
   /** Renderer zoom percentage; 100 leaves the document unscaled. */
@@ -25,4 +28,6 @@ export interface DesktopContentSettings {
   codeFont: string
   /** Default editor executable path; empty uses OS file association. */
   defaultEditor: string
+  /** Expand the conversation history surface from its fixed width to 90% of the page. */
+  wideConversation: boolean
 }

@@ -10,6 +10,7 @@ import {
   DEFAULT_CODE_FONT,
   DEFAULT_EDITOR,
   DEFAULT_UI_FONT,
+  DEFAULT_WIDE_CONVERSATION,
   DEFAULT_ZOOM,
   type DesktopContentSettings,
 } from '../content-settings-types.ts'
@@ -25,6 +26,64 @@ export type ContentRowComponentProps = PropsRuntime<'settings.general.item'> & C
 
 const PLACEHOLDER_UI_FONT = 'system-ui, sans-serif'
 const PLACEHOLDER_CODE_FONT = 'Consolas, monospace'
+
+/**
+ * Switch styling lives with the component so it applies wherever this row
+ * renders (the settings surface may host the row outside the advanced shell
+ * that injects the global desktop content styles).
+ */
+const SWITCH_STYLES = `
+.dshDesktopSwitch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  cursor: pointer;
+}
+.dshDesktopSwitch input[type="checkbox"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.dshDesktopSwitchTrack {
+  box-sizing: border-box;
+  width: 56px;
+  height: 32px;
+  border-radius: 16px;
+  background: var(--dsw-alias-border-l2);
+  transition: background 0.15s ease;
+}
+.dshDesktopSwitchTrack::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+.dshDesktopSwitch input[type="checkbox"]:checked + .dshDesktopSwitchTrack {
+  background: rgb(65, 118, 230);
+}
+.dshDesktopSwitch input[type="checkbox"]:checked + .dshDesktopSwitchTrack::after {
+  transform: translateX(24px);
+}
+.dshDesktopSwitch input[type="checkbox"]:disabled + .dshDesktopSwitchTrack {
+  opacity: 0.5;
+}
+.dshDesktopSwitch input[type="checkbox"]:focus-visible + .dshDesktopSwitchTrack {
+  outline: 2px solid rgb(65, 118, 230);
+  outline-offset: 2px;
+}
+`
 
 const styles = {
   group: {
@@ -45,6 +104,12 @@ const styles = {
     gap: '8px',
     padding: '16px 0',
   } as const,
+  switchRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '16px 0',
+  } as const,
   rowText: {
     flex: 1,
     minWidth: 0,
@@ -52,6 +117,14 @@ const styles = {
     flexDirection: 'column' as const,
     gap: '4px',
     paddingTop: '6px',
+  } as const,
+  rowTextSwitch: {
+    flex: 1,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+    paddingRight: '48px',
   } as const,
   title: {
     fontSize: '14px',
@@ -128,6 +201,7 @@ export function ContentRow({ scope }: ContentRowComponentProps) {
   const uiFont = section?.uiFont ?? DEFAULT_UI_FONT
   const codeFont = section?.codeFont ?? DEFAULT_CODE_FONT
   const defaultEditor = section?.defaultEditor ?? DEFAULT_EDITOR
+  const wideConversation = section?.wideConversation ?? DEFAULT_WIDE_CONVERSATION
 
   const onZoomChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     void scope.set('zoom', Number(event.target.value))
@@ -145,12 +219,17 @@ export function ContentRow({ scope }: ContentRowComponentProps) {
     void scope.set('defaultEditor', event.target.value)
   }, [scope])
 
+  const onWideConversationChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    void scope.set('wideConversation', event.target.checked)
+  }, [scope])
+
   if (snapshot.status === 'loading' || snapshot.status === 'unavailable') return null
 
   const disabled = !snapshot.writable
 
   return (
     <div style={styles.group}>
+    <style>{SWITCH_STYLES}</style>
     <div style={styles.row}>
       <div style={styles.rowText}>
         <div style={styles.title}>内容</div>
@@ -191,7 +270,7 @@ export function ContentRow({ scope }: ContentRowComponentProps) {
         />
       </div>
     </div>
-    <div style={styles.lastRow}>
+    <div style={styles.row}>
       <div style={styles.rowText}>
         <div style={styles.title}>默认编辑器</div>
         <div style={styles.hint}>设置打开文件链接的程序</div>
@@ -207,6 +286,22 @@ export function ContentRow({ scope }: ContentRowComponentProps) {
           aria-label="默认编辑器"
         />
       </div>
+    </div>
+    <div style={styles.switchRow}>
+      <div style={styles.rowTextSwitch}>
+        <div style={styles.title}>宽屏会话</div>
+        <div style={styles.hint}>将会话历史页面的宽度扩展为页面宽度的 90%</div>
+      </div>
+      <label className="dshDesktopSwitch">
+        <input
+          type="checkbox"
+          checked={wideConversation}
+          disabled={disabled}
+          onChange={onWideConversationChange}
+          aria-label="宽屏会话"
+        />
+        <span className="dshDesktopSwitchTrack" />
+      </label>
     </div>
     </div>
   )
