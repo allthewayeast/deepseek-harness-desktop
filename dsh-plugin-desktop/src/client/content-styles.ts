@@ -1,8 +1,7 @@
-/** Global content styles applying user zoom and font settings. */
+/** Global content styles applying user font settings (zoom rides the native view zoom). */
 
 const CONTENT_STYLES = `
 :root {
-  --desktop-zoom: 100%;
   --desktop-ui-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --desktop-code-font: "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace;
 }
