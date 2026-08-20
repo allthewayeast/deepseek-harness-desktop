@@ -2,13 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import { PresetExistsError, UnknownPresetError } from '@deepseek-ai/dsh-agent-presets'
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  WindowsAgentPresets,
-  WINDOWS_SAFE_PRESET,
-  WINDOWS_UNSUPPORTED_PRESET,
-} from '../src/windows-agent-presets.ts'
+import { WindowsAgentPresets } from '../src/windows-agent-presets.ts'
 
 const roots: string[] = []
 const contexts: Context[] = []
@@ -26,8 +21,8 @@ function writePreset(root: string, id: string): void {
 function createRoster(defaultId: string): WindowsAgentPresets {
   const root = mkdtempSync(join(tmpdir(), 'dsh-desktop-windows-presets-'))
   roots.push(root)
-  writePreset(root, WINDOWS_SAFE_PRESET)
-  writePreset(root, WINDOWS_UNSUPPORTED_PRESET)
+  writePreset(root, 'minimal')
+  writePreset(root, 'standard')
   writePreset(root, 'code')
   const ctx = new Context()
   contexts.push(ctx)
@@ -43,43 +38,24 @@ afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-describe('Windows agent preset guard', () => {
-  it('hides the unsupported minimal preset from discovery', async () => {
-    const presets = createRoster(WINDOWS_SAFE_PRESET)
+describe('Windows agent preset roster (issue #317)', () => {
+  it('lists the minimal preset alongside the other shipped presets', async () => {
+    const presets = createRoster('standard')
 
-    expect((await presets.list()).map(preset => preset.id)).toEqual([
-      'code',
-      WINDOWS_SAFE_PRESET,
-    ])
+    expect((await presets.list()).map(preset => preset.id)).toEqual(
+      expect.arrayContaining(['minimal', 'standard', 'code']),
+    )
   })
 
-  it('falls back to standard when minimal was saved as the default', async () => {
-    const presets = createRoster(WINDOWS_UNSUPPORTED_PRESET)
+  it('keeps minimal as the default when the roster names it', () => {
+    const presets = createRoster('minimal')
 
-    expect(presets.defaultId).toBe(WINDOWS_SAFE_PRESET)
-    await expect(presets.resolve()).resolves.toMatchObject({ id: WINDOWS_SAFE_PRESET })
+    expect(presets.defaultId).toBe('minimal')
   })
 
-  it('preserves exact resolution for legacy sessions that recorded minimal', async () => {
-    const presets = createRoster(WINDOWS_SAFE_PRESET)
+  it('resolves the minimal preset by id', async () => {
+    const presets = createRoster('standard')
 
-    await expect(presets.resolve(WINDOWS_UNSUPPORTED_PRESET))
-      .resolves.toMatchObject({ id: WINDOWS_UNSUPPORTED_PRESET })
-  })
-
-  it('rejects switching a blank session to the hidden minimal preset', async () => {
-    const presets = createRoster(WINDOWS_SAFE_PRESET)
-    const agentCtx = new Context()
-    contexts.push(agentCtx)
-
-    await expect(presets.recompose(agentCtx, WINDOWS_UNSUPPORTED_PRESET))
-      .rejects.toBeInstanceOf(UnknownPresetError)
-  })
-
-  it('reserves the hidden minimal id from user-authored copies', async () => {
-    const presets = createRoster(WINDOWS_SAFE_PRESET)
-
-    await expect(presets.copy('code', WINDOWS_UNSUPPORTED_PRESET))
-      .rejects.toBeInstanceOf(PresetExistsError)
+    await expect(presets.resolve('minimal')).resolves.toMatchObject({ id: 'minimal' })
   })
 })
